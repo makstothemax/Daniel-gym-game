@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Daniel im Gym</title>
+<style>
+:root{--bg:#f4ead5;--card:#fff;--tx:#2b2233;--ac:#e8452c;--ok:#1fa35c;--bad:#d6336c;--mut:#6b6275;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17121f;--card:#2a2236;--tx:#f5eefc;--mut:#a99bb8;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17121f;--card:#2a2236;--tx:#f5eefc;--mut:#a99bb8;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,Segoe UI,sans-serif;text-align:center;touch-action:manipulation}
+.w{max-width:440px;margin:0 auto;padding:8px 12px}
+h1{margin:2px 0;font-size:1.3rem}
+.top{display:flex;justify-content:space-between;align-items:center;margin:4px 0;font-weight:700}
+.top button{background:var(--card);color:var(--tx);border:0;border-radius:50%;width:38px;height:38px;font-size:1.2rem;box-shadow:0 1px 4px #0003}
+canvas{display:block;width:100%;border-radius:16px;box-shadow:0 2px 10px #0004;background:#2a2f4a}
+.say{color:var(--mut);min-height:2.6em;font-size:.92rem;display:flex;align-items:center;justify-content:center;margin:6px 0}
+button.b{background:var(--ac);color:#fff;border:0;border-radius:14px;padding:14px 20px;font-size:1.05rem;font-weight:700;margin:6px;cursor:pointer}
+button.b.g{background:var(--bad)}
+button.b.o{background:var(--ok)}
+.ov{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;padding:20px;z-index:5}
+.ov.on{display:flex}
+.box{position:relative;background:var(--card);border-radius:20px;padding:24px 20px;width:100%;max-width:380px}
+.x{position:absolute;top:8px;right:8px;width:38px;height:38px;border-radius:50%;border:0;background:#8882;color:var(--tx);font-size:1.3rem;font-weight:700;cursor:pointer}
+.big{font-size:3.6rem}
+.bar{height:16px;background:#8883;border-radius:9px;overflow:hidden;margin:12px 0}
+.bar i{display:block;height:100%;width:0;background:var(--ac)}
+#tap{width:100%;font-size:1.4rem;padding:24px}
+.sc{font-size:3rem;font-weight:800;color:var(--ac)}
+.em{font-size:3.4rem;margin:6px 0}
+#tap{transition:background .1s}
+#tap.hit{animation:pop .18s}
+@keyframes pop{0%{transform:scale(.9);filter:brightness(1.5);box-shadow:0 0 0 0 #ffd166}60%{transform:scale(1.04);box-shadow:0 0 0 14px #ffd16600}100%{transform:scale(1)}}
+.fl{position:absolute;font-weight:800;font-size:1.5rem;color:var(--ac);pointer-events:none;animation:up .7s forwards}
+@keyframes up{to{transform:translateY(-70px) scale(1.4);opacity:0}}
+</style>
+</head>
+<body>
+<div class="w">
+<div class="top"><span>Punkte: <b id="sc">0</b></span><span>Geräte: <b id="dn">0</b>/4</span><button id="mu" aria-label="Musik">🔊</button></div>
+<canvas id="cv" width="400" height="350"></canvas>
+<div class="say" id="say"></div>
+</div>
+<div class="ov" id="ov"><div class="box" id="box"></div></div>
+
+<script>
+const G=[["🏋️","Hantelbank",64],["🚴","Spinning-Bike",70],["🏃","Laufband",74],["🦵","Beinpresse",54],["🚣","Rudergerät",42],["🧗","Klimmzugstange",92],["🔔","Kettlebells",46],["🧘","Dehnmatte",34]];
+const MP=[[1,1],[5,1],[1,4],[5,4]];
+const FL=["„Hey Daniel, stützt du die Hantel oder sie dich?“","„Ist das Gerät frei? Und du auch?“","„Du hast da einen Bizeps, den ich gern kennenlernen würde.“","„Ich zeig dir gern, wie man richtig schwitzt.“","„Mein Proteinshake ist leider für zwei gedacht...“","„Bist du ein Kreuzheben? Du haust mich nämlich um.“","„Ich glaub, mein Herz hat gerade Cardio gemacht.“","„Hilf mir kurz: Ich brauch jemanden, der auf mich aufpasst.“","„Dein Bart hat mehr Volumen als mein ganzer Trainingsplan.“"];
+const RJ=["Daniel bleibt eisern. Die Hantel wartet! 😎","Autsch, der saß. Daniel zieht sein Training durch.","Daniel: „Sorry, ich hab noch Beine zu trainieren.“","Fokus! Der Muskelmann zieht enttäuscht ab. 💨"];
+const FY=["Daniel wird rot und verliert den Faden... 🙈","Süßes Geplänkel, aber die Wasserflasche fällt runter. 💦","Daniel kichert. Training? Welches Training?","Herzchen-Augen statt Hantel-Fokus. 😍"];
+const MEN=["🧔‍♂️","👱‍♂️","🧑‍🦲","👨‍🦰","🕶️"];
+const CAP=30,TIME=4,BON=10,MINUS=15,EV=2,TW=48,TH=24,OX=200,OY=125,N=8;
+let sc,done,evAt,evMax,busy,deck,cx,cy,dx,dy,path,tgt,face=1,st=0,bubT="",bubU=0;
+const $=id=>document.getElementById(id),cv=$("cv"),c=cv.getContext("2d"),dpr=Math.min(2,devicePixelRatio||1);
+cv.width=400*dpr;cv.height=350*dpr;
+const pick=a=>a[Math.floor(Math.random()*a.length)],shuf=a=>a.slice().sort(()=>Math.random()-.5);
+function show(h){$("box").innerHTML=h;$("ov").classList.add("on")}
+function hide(){$("ov").classList.remove("on")}
+function say(t){$("say").textContent=t}
+function bub(t){bubT=t;bubU=Date.now()+2500}
+function upd(){$("sc").textContent=sc;$("dn").textContent=done.size}
+const blocked=(x,y)=>MP.some(p=>p[0]==x&&p[1]==y);
+function init(){
+ sc=0;done=new Set();busy=false;evMax=0;deck=shuf(FL);path=[];tgt=null;
+ evAt=new Set(shuf([1,2,3]).slice(0,EV));
+ cx=4;cy=7;dx=cx;dy=cy;upd();
+ say("Tippe auf ein Gerät – Daniel läuft hin!");
+ show(`<div class="big">💪</div><h2>Daniel im Gym</h2><p>Tippe auf ein Gerät, Daniel läuft hin und trainiert. Aber Vorsicht vor den Muskelmännern!</p><button class="b" onclick="go()">▶ Los geht's</button>`);
+}
+function go(){hide();startAudio()}
+function route(m){
+ const goal=[[0,1],[0,-1],[1,0],[-1,0]].map(d=>[MP[m][0]+d[0],MP[m][1]+d[1]]).filter(p=>p[0]>=0&&p[0]<N&&p[1]>=0&&p[1]<N&&!blocked(p[0],p[1]));
+ const q=[[cx,cy]],prev={[cx+","+cy]:null};
+ while(q.length){
+  const [x,y]=q.shift();
+  if(goal.some(g=>g[0]==x&&g[1]==y)){const r=[];let k=x+","+y;while(prev[k]){const s=k.split(",").map(Number);r.unshift(s);k=prev[k]}return r}
+  [[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{const nx=x+d[0],ny=y+d[1],k=nx+","+ny;
+   if(nx>=0&&nx<N&&ny>=0&&ny<N&&!blocked(nx,ny)&&!(k in prev)){prev[k]=x+","+y;q.push([nx,ny])}});
+ }
+ return[];
+}
+cv.addEventListener("pointerdown",e=>{
+ if(busy)return;
+ const r=cv.getBoundingClientRect(),mx=(e.clientX-r.left)*400/r.width,my=(e.clientY-r.top)*350/r.height;
+ let best=-1,bd=1e9;
+ MP.forEach((p,i)=>{const s=P(p[0]+.5,p[1]+.5,0),d=Math.hypot(mx-s[0],(my-(s[1]-G[i][2]/2))*1.1);if(d<44&&d<bd){bd=d;best=i}});
+ if(best<0)return;
+ if(done.has(best)){say("Das Gerät hast du schon geschafft ✅");return}
+ busy=true;tgt=best;path=route(best);say("Daniel läuft zur "+G[best][1]+"...");
+});
+function train(i){
+ let n=0,t=TIME,run=true;
+ show(`<div class="big">${G[i][0]}</div><h2>${G[i][1]}</h2><div>Tippe so schnell du kannst!</div><div class="bar"><i id="pb"></i></div><div>Zeit: <b id="tm">${TIME.toFixed(1)}</b>s · Wiederholungen: <b id="rp">0</b></div><button class="b" id="tap">💥 STEMMEN!</button>`);
+ $("tap").onclick=e=>{if(run){n++;$("rp").textContent=n;$("pb").style.width=Math.min(100,n/CAP*100)+"%";hitFx(e)}};
+ const iv=setInterval(()=>{t-=.1;$("tm").textContent=Math.max(0,t).toFixed(1);
+  if(t<=0){clearInterval(iv);run=false;fin(i,Math.min(n,CAP))}},100);
+}
+function fin(i,p){
+ sc+=p;done.add(i);upd();
+ const m=p>=25?"Wahnsinn, Daniel glänzt vor Schweiß!":p>=12?"Solide Arbeit, Daniel pumpt.":"Eher so ein Gym-Spaziergang...";
+ bub(p>=25?"🔥":p>=12?"💪":"😅");say(m);
+ show(`<button class="x" onclick="closeRes()" aria-label="Schließen">✕</button><div class="em">${G[i][0]}</div><h2>${G[i][1]} geschafft!</h2><div class="sc">+${p}</div><div>Punkte</div><p>${m}</p><div>Gesamt: <b>${sc}</b></div>`);
+}
+function hitFx(e){
+ const t=$("tap"),b=$("box");t.classList.remove("hit");void t.offsetWidth;t.classList.add("hit");
+ const r=b.getBoundingClientRect(),s=document.createElement("span");s.className="fl";s.textContent="+1";
+ s.style.left=(e.clientX-r.left-10+Math.random()*30-15)+"px";s.style.top=(e.clientY-r.top-24)+"px";
+ b.appendChild(s);setTimeout(()=>s.remove(),700);if(navigator.vibrate)navigator.vibrate(12);
+}
+function giggle(){
+ if(!AC||!mus)return;const t=AC.currentTime;
+ [0,1,2,3,4,5].forEach(k=>tone(700+(k%2?220:0)+k*30,t+k*.1,.08,"triangle",.16));
+ tone(1150,t+.65,.2,"triangle",.13);
+}
+function goAway(){
+ if(!mus)return;
+ if("speechSynthesis" in window){const u=new SpeechSynthesisUtterance("Go away!");u.lang="en-US";u.rate=.9;u.pitch=.6;speechSynthesis.cancel();speechSynthesis.speak(u)}
+ else if(AC){const t=AC.currentTime;tone(180,t,.25,"sawtooth",.2);tone(130,t+.25,.35,"sawtooth",.2)}
+}
+function closeRes(){
+ hide();
+ if(evAt.has(done.size)){evAt.delete(done.size);setTimeout(flirt,400)}
+ else if(done.size==4)setTimeout(end,400);
+ else busy=false;
+}
+function flirt(){
+ evMax+=BON;if(!deck.length)deck=shuf(FL);
+ show(`<div class="big">💪${pick(MEN)}</div><h2>Ein Muskelmann erscheint!</h2><p>${deck.pop()}</p><button class="b g" onclick="ans(1)">😘 Flirt</button><button class="b o" onclick="ans(0)">🙅 Reject</button>`);
+}
+function ans(f){
+ if(f){giggle();sc-=MINUS;say(pick(FY));bub("😍")}else{goAway();sc+=BON;say(pick(RJ));bub("😎")}
+ upd();hide();
+ if(done.size==4)setTimeout(end,600);else busy=false;
+}
+function end(){
+ const max=4*CAP+evMax,pc=Math.max(0,Math.round(sc/max*100));
+ let m;
+ if(pc>=80)m="🏆 Wow! Du hast sehr konzentriert trainiert. Daniel ist stolz auf dich!";
+ else if(pc>=50)m="👍 Das war ok, aber es geht noch besser. Die Hanteln glauben an dich!";
+ else m="😅 Konzentrier dich mehr auf das Training, Daniel! Die Geräte sind nicht zum Flirten da.";
+ show(`<div class="big">🏁</div><h2>Training beendet!</h2><div class="sc">${sc}</div><div>Highscore · ${pc} % von ${max} möglichen Punkten</div><p>${m}</p><button class="b" onclick="init()">Nochmal trainieren</button>`);
+}
+/* ---------- Grafik ---------- */
+function P(x,y,z=0){return[OX+(x-y)*TW/2,OY+(x+y)*TH/2-z]}
+function sh(h,f){const n=parseInt(h.slice(1),16),m=1+f,k=v=>Math.max(0,Math.min(255,v*m))|0;return`rgb(${k(n>>16)},${k(n>>8&255)},${k(n&255)})`}
+function poly(p,f,s){c.beginPath();p.forEach((q,i)=>i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]));c.closePath();if(f){c.fillStyle=f;c.fill()}if(s){c.strokeStyle=s;c.lineWidth=1;c.stroke()}}
+function box(x,y,w,d,h,col,z=0){
+ poly([P(x,y+d,z),P(x+w,y+d,z),P(x+w,y+d,z+h),P(x,y+d,z+h)],sh(col,-.2));
+ poly([P(x+w,y,z),P(x+w,y+d,z),P(x+w,y+d,z+h),P(x+w,y,z+h)],sh(col,-.4));
+ poly([P(x,y,z+h),P(x+w,y,z+h),P(x+w,y+d,z+h),P(x,y+d,z+h)],col);
+}
+function line(a,b,w,col){c.strokeStyle=col;c.lineWidth=w;c.lineCap="round";c.beginPath();c.moveTo(a[0],a[1]);c.lineTo(b[0],b[1]);c.stroke()}
+function ell(x,y,rx,ry,col){c.fillStyle=col;c.beginPath();c.ellipse(x,y,rx,ry,0,0,7);c.fill()}
+function rr(x,y,w,h,r,col){c.fillStyle=col;c.beginPath();c.roundRect(x,y,w,h,r);c.fill()}
+function wall(e,a0,a1,z0,z1,col){const f=a=>e?P(a,0):P(0,a);poly([[f(a0)[0],f(a0)[1]-z0],[f(a1)[0],f(a1)[1]-z0],[f(a1)[0],f(a1)[1]-z1],[f(a0)[0],f(a0)[1]-z1]],col)}
+function room(){
+ wall(1,0,N,0,95,"#7384ba");wall(0,0,N,0,95,"#5f6fa3");
+ wall(1,0,N,0,8,"#4b5885");wall(0,0,N,0,8,"#3f4b73");
+ wall(1,1.2,2.8,35,75,"#bfe6f7");wall(1,5.2,6.8,35,75,"#bfe6f7");
+ wall(1,1.2,2.8,55,75,"#e8f7ff");wall(1,5.2,6.8,55,75,"#e8f7ff");
+ wall(0,2,6,28,72,"#cfeaf2");wall(0,2,4,28,50,"#ffffff55");
+ wall(0,6.4,7.4,40,80,"#e8452c");wall(0,6.55,7.25,46,74,"#ffd166");
+ wall(1,3.4,4.6,40,68,"#2b2f4a");wall(1,3.5,4.5,45,63,"#ffd166");
+ for(let x=0;x<N;x++)for(let y=0;y<N;y++)poly([P(x,y),P(x+1,y),P(x+1,y+1),P(x,y+1)],(x+y)%2?"#c99b62":"#bd8f57");
+ poly([P(2,2),P(6,2),P(6,6),P(2,6)],"#a8434a");poly([P(2.2,2.2),P(5.8,2.2),P(5.8,5.8),P(2.2,5.8)],null,"#f2c46d");
+ poly([P(0,N),P(N,N),P(N,N,-10),P(0,N,-10)],"#8a5d33");poly([P(N,0),P(N,N),P(N,N,-10),P(N,0,-10)],"#6e4927");
+}
+const M=[
+(x,y)=>{box(x+.15,y+.2,.7,.6,10,"#3b3f55");box(x+.25,y+.28,.55,.44,6,"#d94f3d",10);
+ box(x+.12,y+.12,.07,.07,28,"#9aa0b5");box(x+.12,y+.8,.07,.07,28,"#9aa0b5");
+ const a=P(x+.15,y+.05,32),b=P(x+.15,y+.95,32);line(a,b,3,"#222");[a,b].forEach(q=>{ell(q[0],q[1],5,8,"#2b2f3a");ell(q[0],q[1],2,3,"#888")})},
+(x,y)=>{box(x+.25,y+.2,.5,.6,5,"#2d3142");line(P(x+.5,y+.7,5),P(x+.5,y+.7,36),4,"#9aa0b5");
+ box(x+.4,y+.62,.24,.22,4,"#d94f3d",36);line(P(x+.5,y+.3,5),P(x+.5,y+.3,44),4,"#9aa0b5");box(x+.35,y+.25,.3,.1,3,"#222",44);
+ const w=P(x+.5,y+.45,20);ell(w[0],w[1],12,12,"#454a63");ell(w[0],w[1],8,8,"#e8452c");ell(w[0],w[1],2,2,"#ddd")},
+(x,y)=>{box(x+.05,y+.12,.9,.76,7,"#33384d");box(x+.12,y+.2,.76,.6,1,"#14151e",7);
+ box(x+.05,y+.12,.07,.07,40,"#aab",0);box(x+.05,y+.81,.07,.07,40,"#aab",0);box(x+.03,y+.16,.12,.68,8,"#3a8fd9",40)},
+(x,y)=>{box(x+.1,y+.1,.8,.8,5,"#3b3f55");box(x+.5,y+.2,.32,.6,14,"#d94f3d",5);box(x+.3,y+.25,.12,.5,7,"#d94f3d",5);
+ box(x+.1,y+.2,.12,.6,24,"#aab2c5",5);box(x+.14,y+.1,.05,.05,40,"#9aa0b5");box(x+.14,y+.85,.05,.05,40,"#9aa0b5")},
+(x,y)=>{box(x+.4,y+.02,.2,.96,4,"#c9ced9");const f=P(x+.5,y+.12,16);ell(f[0],f[1],11,11,"#2d3142");ell(f[0],f[1],7,7,"#e8452c");
+ box(x+.35,y+.45,.3,.22,4,"#d94f3d",4);box(x+.3,y+.8,.4,.14,3,"#222",4)},
+(x,y)=>{box(x+.1,y+.1,.14,.14,4,"#2d3142");box(x+.1,y+.76,.14,.14,4,"#2d3142");
+ box(x+.14,y+.14,.06,.06,76,"#9aa0b5",4);box(x+.14,y+.8,.06,.06,76,"#9aa0b5",4);line(P(x+.17,y+.17,80),P(x+.17,y+.83,80),5,"#e8452c")},
+(x,y)=>{box(x+.1,y+.2,.8,.6,14,"#3b3f55");
+ [["#e8452c",.25],["#3a8fd9",.5],["#ffd166",.75]].forEach(k=>{const q=P(x+k[1],y+.5,22);ell(q[0],q[1]-4,8,8,k[0]);c.strokeStyle="#222";c.lineWidth=3;c.beginPath();c.arc(q[0],q[1]-14,5,Math.PI,0);c.stroke()})},
+(x,y)=>{poly([P(x+.05,y+.1),P(x+.95,y+.1),P(x+.95,y+.9),P(x+.05,y+.9)],"#3fb7a5","#2a8a7c");
+ poly([P(x+.12,y+.17),P(x+.88,y+.17),P(x+.88,y+.83),P(x+.12,y+.83)],null,"#7fe0d0");const q=P(x+.7,y+.6,6);ell(q[0],q[1],7,7,"#9b6bd6");box(x+.2,y+.2,.2,.14,5,"#ffd166")}
+];
+function daniel(sx,sy,f,mv){
+ const w=mv?Math.sin(st)*4:0,b=mv?-Math.abs(Math.sin(st))*2:0;
+ c.save();c.translate(sx,sy);ell(0,0,14,6,"#0004");c.translate(0,b);c.scale(f,1);
+ const S="#e0a982",H="#2a1a14";
+ rr(-8+w,-16,6,13,3,S);rr(2-w,-16,6,13,3,S);ell(-5+w,-2,5,3,"#fff");ell(5-w,-2,5,3,"#fff");
+ rr(-11,-26,22,13,4,"#2f3d7a");rr(-12,-46,24,23,7,"#e8452c");rr(-5,-46,10,8,4,S);
+ ell(-15,-36,5.5,6,S);ell(15,-36,5.5,6,S);rr(-19,-34,7,13,3,S);rr(12,-34,7,13,3,S);
+ ell(0,-56,10,11,S);c.fillStyle=H;c.beginPath();c.ellipse(0,-60,11,8,0,Math.PI,0);c.fill();
+ rr(-11,-62,3,10,2,H);rr(8,-62,3,10,2,H);
+ c.beginPath();c.moveTo(-10.5,-56);c.quadraticCurveTo(-11,-41,0,-41);c.quadraticCurveTo(11,-41,10.5,-56);c.quadraticCurveTo(6,-51,0,-51);c.quadraticCurveTo(-6,-51,-10.5,-56);c.fill();
+ c.strokeStyle="#d98a7c";c.lineWidth=1.6;c.beginPath();c.moveTo(-3,-47);c.quadraticCurveTo(0,-45,3,-47);c.stroke();
+ ell(-4,-57,2.4,2.6,"#fff");ell(4,-57,2.4,2.6,"#fff");ell(-3.4,-57,1.3,1.5,"#111");ell(4.6,-57,1.3,1.5,"#111");
+ c.restore();
+}
+function frame(){
+ c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,400,350);
+ room();
+ let mv=false;
+ if(path.length){
+  const t=path[0],ddx=t[0]-dx,ddy=t[1]-dy,d=Math.hypot(ddx,ddy);mv=true;
+  face=(ddx-ddy)>0?1:(ddx-ddy)<0?-1:face;
+  if(d<.08){dx=t[0];dy=t[1];cx=t[0];cy=t[1];path.shift();
+   if(!path.length){mv=false;const m=tgt;tgt=null;if(m!==null)setTimeout(()=>train(m),150)}}
+  else{dx+=ddx/d*.06;dy+=ddy/d*.06}
+ }
+ st+=mv?.35:0;
+ const objs=MP.map((p,i)=>({d:p[0]+p[1]+1,f:()=>{M[i](p[0],p[1])}}));
+ objs.push({d:dx+dy+1.01,f:()=>{const s=P(dx+.5,dy+.5);daniel(s[0],s[1],face,mv);
+  if(Date.now()<bubU){c.font="22px sans-serif";c.textAlign="center";c.fillText(bubT,s[0],s[1]-82)}}});
+ objs.sort((a,b)=>a.d-b.d).forEach(o=>o.f());
+ MP.forEach((p,i)=>{const s=P(p[0]+.5,p[1]+.5,G[i][2]+12);
+  ell(s[0],s[1],13,13,done.has(i)?"#1fa35c":"#fffe");c.font="16px sans-serif";c.textAlign="center";c.textBaseline="middle";c.fillStyle="#fff";
+  c.fillText(done.has(i)?"✓":G[i][0],s[0],s[1]+1)});
+ requestAnimationFrame(frame);
+}
+/* ---------- Musik ---------- */
+let AC,mus=true,nxt=0,stp=0;
+const D=60/128/4,R=[110,87.31,130.81,98],CH=[[0,3,7],[0,4,7],[0,4,7],[0,4,7]];
+function startAudio(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();AC.resume();nxt=AC.currentTime+.1;setInterval(sched,50)}catch(e){}}
+function sched(){if(!AC)return;if(!mus||document.hidden){nxt=AC.currentTime+.1;return}while(nxt<AC.currentTime+.25){play(stp,nxt);nxt+=D;stp=(stp+1)%64}}
+function tone(f,t,d,ty,v){const o=AC.createOscillator(),g=AC.createGain();o.type=ty;o.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d)}
+function kick(t){const o=AC.createOscillator(),g=AC.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(40,t+.12);g.gain.setValueAtTime(.3,t);g.gain.exponentialRampToValueAtTime(.001,t+.16);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+.17)}
+function play(s,t){
+ const b=s>>4,i=s&15,r=R[b];
+ if(i%4==0)kick(t);if(i%4==2)tone(9000,t,.04,"square",.012);
+ if(i%2==0)tone(i%4==2?r*2:r,t,.16,"sawtooth",.07);
+ const n=CH[b][[0,1,2,1][i%4]]+(i>7&&i%4==3?12:0);
+ tone(r*4*Math.pow(2,n/12),t,.1,"square",.03);
+}
+$("mu").onclick=()=>{mus=!mus;$("mu").textContent=mus?"🔊":"🔇";startAudio()};
+init();frame();
+</script>
+</body>
+</html>
